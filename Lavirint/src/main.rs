@@ -3,6 +3,9 @@
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::io::ErrorKind;
+use std::vec;
+use std::collections::VecDeque;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 struct Lavirint{
@@ -107,9 +110,22 @@ impl Lavirint{
         print!("*************\n");
     }
 
+    fn dobavi_polje_na_indeksu(&self, vrsta: i8, kolona: i8) -> &Polje{
+        return self.lavirint.get(vrsta as usize).unwrap().get(kolona as usize).unwrap();
+    }
+
+    fn postoje_vrata(&self, sa_indeksa: Pozicija, na_indeks: Pozicija) ->bool{
+        let sa_polja = self.dobavi_polje_na_indeksu(sa_indeksa.vrsta, sa_indeksa.kolona);
+        for vrata in sa_polja.vrata_prolaz.clone() {
+            if vrata == na_indeks {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct Pozicija{
     vrsta: i8,
     kolona: i8,
@@ -137,13 +153,138 @@ impl Trenutna{
             neiskorisceni_kljucevi: Vec::new()
         }
     }
+
+    fn poseduje_kljuc(&self)-> bool{
+        for kljuc in &self.kljucevi{
+            if kljuc.sa_pozicije.vrsta==self.trenutna_pozicija.vrsta && kljuc.sa_pozicije.kolona==self.trenutna_pozicija.kolona{
+                return true;   
+            }
+        }
+        return false;
+    }
+
+    fn dobavi_legalne_pozicije(&self, lavirint: &Lavirint)->Vec<Pozicija>{
+        let polje = lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona);
+        let mut legalne_pozicije: Vec<Pozicija> = Vec::new();
+        let mut moguce_pozicije= polje.slobodan_prolaz.clone();
+        let mut moguce_sa_vratima = polje.vrata_prolaz.clone();
+        legalne_pozicije.append(&mut moguce_pozicije);
+        if self.neiskorisceni_kljucevi.len()>=1 {
+            legalne_pozicije.append(&mut moguce_sa_vratima);
+        }
+        return legalne_pozicije;
+    }
+
+    fn dobavi_hash_stanje(&self, vrsta: i8, kolona: i8) ->String{
+        let mut hash_stanja = String::from("");
+        hash_stanja=
+        "[".to_owned()
+        +&vrsta.to_string()
+        +","
+        +&kolona.to_string()
+        +"]";
+        for kljuc in &self.kljucevi{
+            hash_stanja=
+            "[".to_owned()
+            +&hash_stanja
+            +&kljuc.sa_pozicije.vrsta.to_string()
+            +","
+            +&kljuc.sa_pozicije.kolona.to_string()
+            +"]";
+        }
+        return hash_stanja;
+
+    }
+
+    
+    fn resavanje(&mut self,mut obradjena_stanja:VecDeque<Trenutna>,set_obradjenih_stanja:&mut HashSet<String>, lavirint: &Lavirint  ) -> bool{
+        let tren = self.clone();
+        obradjena_stanja.push_back(tren);
+        set_obradjenih_stanja.insert(self.dobavi_hash_stanje(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona)); //hashovi stanja za obradu
+        print!("Trenutno na polju {:?}\n", self.trenutna_pozicija);
+        
+        if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).izlaz {
+            print!("Pronadjen je izlaz!");
+           return true; //pronadjen je izlaz 
+        }
+        
+        if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).kljuc && !self.poseduje_kljuc(){ //kupimo kljuc ako vec nismo
+            self.kljucevi.push(Kljuc::new(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona));
+            self.neiskorisceni_kljucevi.push(Pozicija::from(self.trenutna_pozicija));
+        }
+
+        let new_positions = self.dobavi_legalne_pozicije(lavirint); //dobavlja sve moguce legalne pozicije iz trenutne pozicije
+            for next in new_positions  {
+                if  !set_obradjenih_stanja.contains(&self.dobavi_hash_stanje(next.vrsta, next.kolona)){
+                    print!("Nije obradjivano stanje, preacivanje sa pozicije {:?} na {:?}!\n", self.trenutna_pozicija, next);
+                    let nextPolje= lavirint.dobavi_polje_na_indeksu(next.vrsta, next.kolona);
+                    if lavirint.postoje_vrata(self.trenutna_pozicija, next){
+                        let kljuc = self.neiskorisceni_kljucevi.pop();
+                        match kljuc {
+                            None => {continue;},
+                            Some(vrednost) =>{
+                            }
+                        }
+                        for mut klj in self.kljucevi.clone()  {
+                            if klj.sa_pozicije==kljuc.unwrap() {
+                                klj.iskorisceno_na = next;
+                            }
+                        }
+
+                    }
+                    self.trenutna_pozicija=next;
+                    let reseno = self.resavanje(obradjena_stanja.clone(), set_obradjenih_stanja, lavirint);
+                    if reseno {
+                        return true;
+                    }
+                
+                }
+                    
+
+
+            }
+            return false;
+            
+    }
+    
+    
+
+    
+    fn prolazi_kroz_lavirint(&mut self, lavirint: Lavirint){
+
+            //let mut stanja:VecDeque<&Trenutna> = VecDeque::new(); //stanja za obradu
+            
+            
+            let mut set_stanja:HashSet<String>=HashSet::new();
+            set_stanja.insert(self.dobavi_hash_stanje(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona)); //hashovi stanja za obradu
+
+            let mut obradjena_stanja:VecDeque<Trenutna> = VecDeque::new();
+            let mut set_obradjenih_stanja:HashSet<String>=HashSet::new(); //cuvamo sve hash kodove stanja u kojima smo bili, kako ne bismo dva puta bili u istom stanju
+
+            if self.resavanje(obradjena_stanja, &mut set_obradjenih_stanja, &lavirint) {
+                print!("Pronadjen je izlaz!");
+            } else {
+                print!("Nije pronadjen izlaz!");
+            }
+            
+
+    }
 }
+
+
 
 #[derive(Debug, Clone, Copy)]
 struct Kljuc{
     sa_pozicije: Pozicija,
     iskorisceno_na: Pozicija,
-    mesto: i8,
+}
+
+impl Kljuc {
+    fn new(vrsta: i8, kolona: i8) ->Self{
+        Kljuc { 
+            sa_pozicije: Pozicija { vrsta: vrsta, kolona: kolona }, 
+            iskorisceno_na: Pozicija { vrsta: -1, kolona: -1 } }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -173,5 +314,7 @@ impl Polje {
 fn main() {
     let mut lavirint = Lavirint::new();
     lavirint.ucitaj_iz_fajla();
-    lavirint.ispisi_lavirint();
+    //lavirint.ispisi_lavirint();
+    let mut trenutno = Trenutna::new();
+    trenutno.prolazi_kroz_lavirint(lavirint);
 }
