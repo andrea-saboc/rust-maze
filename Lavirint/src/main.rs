@@ -197,11 +197,8 @@ impl Trenutna{
     }
 
     
-    fn resavanje(&mut self,mut obradjena_stanja:VecDeque<Trenutna>,mut set_obradjenih_stanja:&mut HashSet<String>, lavirint: &Lavirint, mut put:&mut VecDeque<Trenutna>, mut putevi:&mut VecDeque<VecDeque<Trenutna>> ) -> bool{
-        //let pronadjen_put = false;
-        print!("tu!");
-
-        
+    fn resavanje(&mut self,mut obradjena_stanja:VecDeque<Trenutna>,mut set_obradjenih_stanja:&mut HashSet<String>, lavirint: &Lavirint, mut put:&mut VecDeque<Trenutna>, mut putevi:&mut VecDeque<VecDeque<Trenutna>>, mut rollback: bool ) -> bool{
+        //let pronadjen_put = false;        
         if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).kljuc && !self.poseduje_kljuc(){ //kupimo kljuc ako vec nismo
             self.kljucevi.push(Kljuc::new(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona));
             self.neiskorisceni_kljucevi.push(Pozicija::from(self.trenutna_pozicija));
@@ -224,6 +221,7 @@ impl Trenutna{
         let new_positions = self.dobavi_legalne_pozicije(lavirint); //dobavlja sve moguce legalne pozicije iz trenutne pozicije
             for next in new_positions  {
                 if  !set_obradjenih_stanja.contains(&self.dobavi_hash_stanje(next.vrsta, next.kolona)){
+                    rollback=false;
                    //print!("preacivanje sa pozicije {:?} na {:?}!\n", self.trenutna_pozicija, next);
                     let mut novo_stanje = self.clone();
                     let nextPolje= lavirint.dobavi_polje_na_indeksu(next.vrsta, next.kolona);
@@ -242,19 +240,19 @@ impl Trenutna{
 
                     }
                     novo_stanje.trenutna_pozicija=next;
-                    let reseno = novo_stanje.resavanje(obradjena_stanja.clone(), &mut set_obradjenih_stanja, lavirint,&mut put, &mut putevi);
+                    let reseno = novo_stanje.resavanje(obradjena_stanja.clone(), &mut set_obradjenih_stanja, lavirint,&mut put, &mut putevi, rollback);
                     if reseno {
+                        rollback=true;
                         print!("reseno");
                         putevi.push_back(put.clone());
-                        //print!("{}",&self.dobavi_hash_stanje(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona));
-                        set_obradjenih_stanja.remove(&self.dobavi_hash_stanje(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona)); 
-
-                       // pronadjen_put=true;
-
+                        
                     } 
+                    if rollback {
+                        set_obradjenih_stanja.remove(&self.dobavi_hash_stanje(novo_stanje.trenutna_pozicija.vrsta, novo_stanje.trenutna_pozicija.kolona)); 
+                        
+                    }
 
                     put.pop_back();
-                    //set_obradjenih_stanja.remove(&self.dobavi_hash_stanje(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona)); 
                 
                 }
             }
@@ -279,7 +277,7 @@ impl Trenutna{
             let mut put:VecDeque<Trenutna> = VecDeque::new();
             let mut putevi:VecDeque<VecDeque<Trenutna>> = VecDeque::new();
 
-            self.resavanje(obradjena_stanja, &mut set_obradjenih_stanja, &lavirint, &mut put, &mut putevi);
+            self.resavanje(obradjena_stanja, &mut set_obradjenih_stanja, &lavirint, &mut put, &mut putevi, false);
             if putevi.len()>0 {
                 print!("Pronadjen je izlaz!");
             } else {
