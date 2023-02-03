@@ -1,5 +1,6 @@
 //Andrea Sabo Cibolja E2 91/2022
 
+use core::prelude::v1;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::io::ErrorKind;
@@ -12,11 +13,12 @@ struct Lavirint{
     br_vrsta: i8,
     br_kolona: i8,
     lavirint: Vec<Vec<Polje>>,
+
 }
 
 impl Lavirint{
     fn new() -> Self{
-        Lavirint { br_vrsta: 0, br_kolona: 0, lavirint: Vec::new() }
+        Lavirint { br_vrsta: 0, br_kolona: 0, lavirint: Vec::new()}
     }
 
     fn ucitaj_iz_fajla(&mut self) {
@@ -34,8 +36,8 @@ impl Lavirint{
                     panic!("Problem opening the file : {:?}", other_error);
                 }
             }
-
         };
+
         let mut trenutna_kolona = 0;
         let lines = io::BufReader::new(opened_file).lines();
         for line in lines  {
@@ -123,6 +125,43 @@ impl Lavirint{
         }
         return false;
     }
+
+    fn proveri_korak(&self, put: VecDeque<Trenutna>, vrsta: i8, kolona: i8) -> Vec<i32>{
+        let mut i =1;
+        let mut v:Vec<i32>=Vec::new();
+        for stanje in put  {
+            if  stanje.trenutna_pozicija.vrsta==vrsta && stanje.trenutna_pozicija.kolona==kolona{
+                v.push(i);
+            }
+            i+=1;
+        }
+        return v;
+
+    }
+    
+    fn rekonstruisi_put(&self, put: VecDeque<Trenutna>) {
+        for i in 0..self.br_vrsta{
+            print!("\n\n");
+
+            
+            for j in 0..self.br_kolona {
+                let mut v1: Vec<i32> = self.proveri_korak(put.clone(), i, j);
+                print!("\t");
+                if v1.is_empty() {
+                    print!("*");
+                } else {
+                    for v in v1  {
+                        print!("{},",v);
+                    }
+                }
+            }
+            print!("\n");
+        }
+        
+
+        
+    }
+
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -136,7 +175,6 @@ struct Trenutna{
     trenutna_pozicija: Pozicija,
     kljucevi: Vec<Kljuc>,
     neiskorisceni_kljucevi: Vec<Pozicija>,
-
 }
 
 impl Pozicija{
@@ -206,8 +244,6 @@ impl Trenutna{
         if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).izlaz {
            return true; //pronadjen je izlaz 
         }
-        
-        
 
         let new_positions = self.dobavi_legalne_pozicije(lavirint); //dobavlja sve moguce legalne pozicije iz trenutne pozicije
             for next in new_positions  {
@@ -254,9 +290,7 @@ impl Trenutna{
     }
     
     
-
-    
-    fn prolazi_kroz_lavirint(&mut self, lavirint: Lavirint){
+    fn prolazi_kroz_lavirint(&mut self, mut lavirint: Lavirint){
 
             
             let mut set_stanja:HashSet<String>=HashSet::new();
@@ -278,12 +312,14 @@ impl Trenutna{
                     najkraci = put;
                 }
             }
-           // print!("{:?}", najkraci);
+
            print!("\n\nPut kojim prolazi({}):",najkraci.len());
             
-            for stanje in najkraci {
+            for stanje in &najkraci {
                 print!("\n{:?}", stanje.trenutna_pozicija);
             }
+            lavirint.rekonstruisi_put(najkraci.clone());
+
             } else {
                 print!("Nije pronadjen izlaz!");
             }
