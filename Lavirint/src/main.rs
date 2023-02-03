@@ -136,6 +136,7 @@ struct Trenutna{
     trenutna_pozicija: Pozicija,
     kljucevi: Vec<Kljuc>,
     neiskorisceni_kljucevi: Vec<Pozicija>,
+    using_key: Pozicija
 
 }
 
@@ -150,7 +151,8 @@ impl Trenutna{
         Trenutna {
             trenutna_pozicija: Pozicija::new(0, 0),
             kljucevi: Vec::new(),
-            neiskorisceni_kljucevi: Vec::new()
+            neiskorisceni_kljucevi: Vec::new(),
+            using_key: Pozicija::new( -1, -1),
         }
     }
 
@@ -190,6 +192,8 @@ impl Trenutna{
             +&kljuc.sa_pozicije.vrsta.to_string()
             +","
             +&kljuc.sa_pozicije.kolona.to_string()
+            +"iskoriscen na:"
+            +&kljuc.iskorisceno_na.vrsta.to_string()+","+&kljuc.iskorisceno_na.kolona.to_string()
             +"]";
         }
         return hash_stanja;
@@ -197,11 +201,11 @@ impl Trenutna{
     }
 
     
-    fn resavanje(&mut self,mut obradjena_stanja:VecDeque<Trenutna>,mut set_obradjenih_stanja:&mut HashSet<String>, lavirint: &Lavirint, mut put:&mut VecDeque<Trenutna>, mut putevi:&mut VecDeque<VecDeque<Trenutna>>, mut rollback: bool ) -> bool{
+    fn resavanje(&mut self,mut obradjena_stanja:&mut VecDeque<Trenutna>,mut set_obradjenih_stanja:&mut HashSet<String>, lavirint: &Lavirint, mut put:&mut VecDeque<Trenutna>, mut putevi:&mut VecDeque<VecDeque<Trenutna>>, mut rollback: &mut bool ) -> bool{
         //let pronadjen_put = false;        
-        if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).kljuc && !self.poseduje_kljuc(){ //kupimo kljuc ako vec nismo
-            self.kljucevi.push(Kljuc::new(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona));
-            self.neiskorisceni_kljucevi.push(Pozicija::from(self.trenutna_pozicija));
+       /* */ if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).kljuc && !self.poseduje_kljuc(){ //kupimo kljuc ako vec nismo
+         //   self.kljucevi.push(Kljuc::new(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona));
+         //  self.neiskorisceni_kljucevi.push(Pozicija::from(self.trenutna_pozicija));
         }
 
         let tren = self.clone();
@@ -213,6 +217,20 @@ impl Trenutna{
         
         if lavirint.dobavi_polje_na_indeksu(self.trenutna_pozicija.vrsta, self.trenutna_pozicija.kolona).izlaz {
             //print!("Pronadjen je izlaz!");
+            if put.len()==15
+             {
+               /* for hs in set_obradjenih_stanja.clone(){
+                    print!("\n{}", hs);
+
+                }*/
+                print!("\n");
+                for obr_st in obradjena_stanja.clone()  {
+                    print!("\n{}", obr_st.dobavi_hash_stanje(obr_st.trenutna_pozicija.vrsta, obr_st.trenutna_pozicija.kolona));
+                }
+                print!("\n");
+               // print!("{:?}", obradjena_stanja);
+                
+            }
            return true; //pronadjen je izlaz 
         }
         
@@ -220,12 +238,16 @@ impl Trenutna{
 
         let new_positions = self.dobavi_legalne_pozicije(lavirint); //dobavlja sve moguce legalne pozicije iz trenutne pozicije
             for next in new_positions  {
+                *rollback=false;
                 if  !set_obradjenih_stanja.contains(&self.dobavi_hash_stanje(next.vrsta, next.kolona)){
-                    rollback=false;
-                   //print!("preacivanje sa pozicije {:?} na {:?}!\n", self.trenutna_pozicija, next);
+                    
+
                     let mut novo_stanje = self.clone();
                     let nextPolje= lavirint.dobavi_polje_na_indeksu(next.vrsta, next.kolona);
-                    if lavirint.postoje_vrata(novo_stanje.trenutna_pozicija, next){
+
+                    
+
+                    if lavirint.postoje_vrata(self.trenutna_pozicija, next){
                         let kljuc = novo_stanje.neiskorisceni_kljucevi.pop();
                         match kljuc {
                             None => {continue;},
@@ -240,15 +262,20 @@ impl Trenutna{
 
                     }
                     novo_stanje.trenutna_pozicija=next;
-                    let reseno = novo_stanje.resavanje(obradjena_stanja.clone(), &mut set_obradjenih_stanja, lavirint,&mut put, &mut putevi, rollback);
+
+                    if lavirint.dobavi_polje_na_indeksu(novo_stanje.trenutna_pozicija.vrsta, novo_stanje.trenutna_pozicija.kolona).kljuc && !novo_stanje.poseduje_kljuc(){ //kupimo kljuc ako vec nismo
+                        novo_stanje.kljucevi.push(Kljuc::new(novo_stanje.trenutna_pozicija.vrsta, novo_stanje.trenutna_pozicija.kolona));
+                        novo_stanje.neiskorisceni_kljucevi.push(Pozicija::from(novo_stanje.trenutna_pozicija));
+                    }
+
+                    let reseno = novo_stanje.resavanje(&mut obradjena_stanja, &mut set_obradjenih_stanja, lavirint,&mut put, &mut putevi,&mut rollback);
                     if reseno {
-                        rollback=true;
-                        print!("reseno");
+                        *rollback=true;
                         putevi.push_back(put.clone());
                         
                     } 
-                    if rollback {
-                        set_obradjenih_stanja.remove(&self.dobavi_hash_stanje(novo_stanje.trenutna_pozicija.vrsta, novo_stanje.trenutna_pozicija.kolona)); 
+                    if *rollback {
+                        set_obradjenih_stanja.remove(&novo_stanje.dobavi_hash_stanje(novo_stanje.trenutna_pozicija.vrsta, novo_stanje.trenutna_pozicija.kolona)); 
                         
                     }
 
@@ -276,15 +303,12 @@ impl Trenutna{
             let mut set_obradjenih_stanja:HashSet<String>=HashSet::new(); //cuvamo sve hash kodove stanja u kojima smo bili, kako ne bismo dva puta bili u istom stanju
             let mut put:VecDeque<Trenutna> = VecDeque::new();
             let mut putevi:VecDeque<VecDeque<Trenutna>> = VecDeque::new();
+            let mut rollback = false;
 
-            self.resavanje(obradjena_stanja, &mut set_obradjenih_stanja, &lavirint, &mut put, &mut putevi, false);
+            self.resavanje(&mut obradjena_stanja, &mut set_obradjenih_stanja, &lavirint, &mut put, &mut putevi, &mut rollback);
             if putevi.len()>0 {
                 print!("Pronadjen je izlaz!");
-            } else {
-                print!("Nije pronadjen izlaz!");
-            }
-
-            print!("\n\nPut kojim prolazi,({}):",put.len());
+                print!("\n\nPronadjeno puteva: ({}).",putevi.len());
 
             let mut najkraci = putevi.pop_front().unwrap();
             for put in putevi  {
@@ -293,10 +317,16 @@ impl Trenutna{
                 }
             }
            // print!("{:?}", najkraci);
+           print!("\n\nPut kojim prolazi({}):",najkraci.len());
             
             for stanje in najkraci {
-                print!("\n{:?}", stanje);
+                print!("\n{:?}", stanje.trenutna_pozicija);
             }
+            } else {
+                print!("Nije pronadjen izlaz!");
+            }
+
+            
             
 
     }
@@ -345,7 +375,7 @@ impl Polje {
 fn main() {
     let mut lavirint = Lavirint::new();
     lavirint.ucitaj_iz_fajla();
-    //lavirint.ispisi_lavirint();
+    lavirint.ispisi_lavirint();
     let mut trenutno = Trenutna::new();
     trenutno.prolazi_kroz_lavirint(lavirint);
 }
